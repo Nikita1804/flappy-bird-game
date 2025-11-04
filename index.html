@@ -2,9 +2,18 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Flappy Bird</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
         body {
             margin: 0;
             padding: 0;
@@ -15,24 +24,30 @@
             background: linear-gradient(to bottom, #87CEEB, #1E90FF);
             font-family: Arial, sans-serif;
             overflow: hidden;
+            touch-action: manipulation;
         }
         
         #gameContainer {
             position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 100%;
+            max-height: 100%;
         }
         
         #gameCanvas {
-            border: 3px solid #333;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #87CEEB;
         }
         
         #scoreDisplay {
             position: absolute;
-            top: 20px;
+            top: 5%;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 40px;
+            font-size: 8vw;
             font-weight: bold;
             color: white;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
@@ -49,9 +64,10 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.85);
             color: white;
-            border-radius: 7px;
+            text-align: center;
+            padding: 5%;
         }
         
         #gameOverScreen {
@@ -59,54 +75,95 @@
         }
         
         h1 {
-            font-size: 48px;
-            margin-bottom: 20px;
+            font-size: 12vw;
+            margin-bottom: 5%;
             color: #FFD700;
             text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.8);
         }
         
         button {
-            padding: 15px 30px;
-            font-size: 20px;
+            padding: 4% 8%;
+            font-size: 5vw;
             background: #FFD700;
             border: none;
             border-radius: 25px;
             cursor: pointer;
-            margin: 10px;
+            margin: 3%;
             font-weight: bold;
             transition: all 0.3s;
+            min-width: 60%;
+            min-height: 10%;
         }
         
-        button:hover {
+        button:active {
             background: #FFA500;
-            transform: scale(1.1);
+            transform: scale(0.95);
         }
         
         .instructions {
             text-align: center;
-            margin: 20px;
-            font-size: 18px;
-            line-height: 1.5;
+            margin: 5%;
+            font-size: 4.5vw;
+            line-height: 1.4;
+            color: #fff;
+        }
+        
+        /* Адаптация для очень маленьких экранов */
+        @media (max-height: 500px) {
+            h1 {
+                font-size: 10vw;
+                margin-bottom: 2%;
+            }
+            
+            .instructions {
+                font-size: 4vw;
+                margin: 2%;
+            }
+            
+            button {
+                font-size: 4vw;
+                padding: 3% 6%;
+            }
+        }
+        
+        /* Адаптация для горизонтальной ориентации */
+        @media (orientation: landscape) and (max-height: 400px) {
+            h1 {
+                font-size: 8vh;
+            }
+            
+            .instructions {
+                font-size: 3vh;
+            }
+            
+            button {
+                font-size: 3vh;
+                padding: 2% 4%;
+            }
+            
+            #scoreDisplay {
+                font-size: 6vh;
+            }
         }
     </style>
 </head>
 <body>
     <div id="gameContainer">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <canvas id="gameCanvas"></canvas>
         <div id="scoreDisplay">0</div>
         
         <div id="startScreen">
             <h1>FLAPPY BIRD</h1>
             <div class="instructions">
-                Нажимай ПРОБЕЛ или кликай мышью, чтобы лететь<br>
-                Избегай труб и не падай!
+                💥 Тапай по экрану чтобы лететь!<br>
+                🚫 Избегай труб!
             </div>
-            <button id="startButton">НАЧАТЬ ИГРУ</button>
+            <button id="startButton">ИГРАТЬ</button>
         </div>
         
         <div id="gameOverScreen">
-            <h1>ИГРА ОКОНЧЕНА!!!!!</h1>
-            <div id="finalScore" style="font-size: 36px; margin: 20px;">Счет: 0</div>
+            <h1>ПРОИГРЫШ</h1>
+            <div id="finalScore" style="font-size: 8vw; margin: 5%;">Счет: 0</div>
             <button id="restartButton">ИГРАТЬ СНОВА</button>
         </div>
     </div>
@@ -123,6 +180,7 @@
                 
                 this.init();
                 this.setupEventListeners();
+                this.handleResize();
             }
             
             init() {
@@ -131,30 +189,58 @@
                 this.score = 0;
                 this.frameCount = 0;
                 
-                // Параметры птички
+                // Базовые размеры для расчета
+                this.baseWidth = 375; // Базовая ширина для мобильных
+                this.baseHeight = 667; // Базовая высота для мобильных
+                
+                // Масштаб
+                this.scale = 1;
+                
+                // Инициализация размеров
+                this.updateSizes();
+            }
+            
+            updateSizes() {
+                const container = document.getElementById('gameContainer');
+                this.canvas.width = container.clientWidth;
+                this.canvas.height = container.clientHeight;
+                
+                // Рассчитываем масштаб относительно базовых размеров
+                this.scale = Math.min(
+                    this.canvas.width / this.baseWidth,
+                    this.canvas.height / this.baseHeight
+                );
+                
+                // Обновляем параметры птички с учетом масштаба
                 this.bird = {
-                    x: 100,
+                    x: this.canvas.width * 0.15,
                     y: this.canvas.height / 2,
-                    width: 40,
-                    height: 30,
+                    width: 40 * this.scale,
+                    height: 30 * this.scale,
                     velocity: 0,
-                    gravity: 0.6,
-                    jumpForce: -12,
+                    gravity: 0.6 * this.scale,
+                    jumpForce: -12 * this.scale,
                     rotation: 0
                 };
                 
                 // Трубы
-                this.pipes = [];
-                this.pipeWidth = 80;
-                this.pipeGap = 250;
-                this.pipeSpeed = 3;
-                this.pipeFrequency = 120; // кадры между трубами
+                this.pipeWidth = 80 * this.scale;
+                this.pipeGap = 180 * this.scale;
+                this.pipeSpeed = 3 * this.scale;
+                this.pipeFrequency = Math.max(60, Math.floor(120 * this.scale));
                 
                 // Земля
                 this.ground = {
-                    y: this.canvas.height - 80,
-                    height: 80
+                    y: this.canvas.height - (80 * this.scale),
+                    height: 80 * this.scale
                 };
+                
+                // Обновляем существующие трубы
+                if (this.pipes) {
+                    this.pipes = [];
+                } else {
+                    this.pipes = [];
+                }
             }
             
             setupEventListeners() {
@@ -170,27 +256,52 @@
                     }
                 });
                 
+                // Тап/клик по всему экрану
                 this.canvas.addEventListener('click', () => this.handleJump());
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.handleJump();
+                });
                 
-                // Запрет контекстного меню
+                // Запрет контекстного меню и масштабирования
                 this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+                
+                // Обработка изменения размера
+                window.addEventListener('resize', () => this.handleResize());
+                window.addEventListener('orientationchange', () => this.handleResize());
+            }
+            
+            handleResize() {
+                setTimeout(() => {
+                    this.updateSizes();
+                    if (this.gameState === 'playing') {
+                        this.draw();
+                    }
+                }, 100);
             }
             
             startGame() {
                 this.gameState = 'playing';
                 this.startScreen.style.display = 'none';
+                this.updateSizes(); // Обновляем размеры перед началом игры
                 this.gameLoop();
             }
             
             restartGame() {
                 this.gameOverScreen.style.display = 'none';
-                this.init();
+                this.score = 0;
+                this.scoreDisplay.textContent = '0';
+                this.frameCount = 0;
+                this.pipes = [];
+                this.updateSizes();
                 this.startGame();
             }
             
             handleJump() {
                 if (this.gameState === 'playing') {
                     this.bird.velocity = this.bird.jumpForce;
+                } else if (this.gameState === 'menu') {
+                    this.startGame();
                 }
             }
             
@@ -221,10 +332,16 @@
                 if (this.bird.y + this.bird.height / 2 > this.ground.y) {
                     this.gameOver();
                 }
+                
+                // Проверка потолка
+                if (this.bird.y - this.bird.height / 2 < 0) {
+                    this.bird.y = this.bird.height / 2;
+                    this.bird.velocity = 0;
+                }
             }
             
             createPipe() {
-                const minHeight = 50;
+                const minHeight = 50 * this.scale;
                 const maxHeight = this.ground.y - this.pipeGap - minHeight;
                 const topHeight = Math.random() * (maxHeight - minHeight) + minHeight;
                 
@@ -282,11 +399,6 @@
                         return;
                     }
                 }
-                
-                // Столкновение с потолком
-                if (birdTop < 0) {
-                    this.gameOver();
-                }
             }
             
             gameOver() {
@@ -315,13 +427,14 @@
             
             drawClouds() {
                 this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                const cloudSize = 30 * this.scale;
                 for (let i = 0; i < 3; i++) {
-                    const x = (this.frameCount * 0.5 + i * 200) % (this.canvas.width + 200) - 100;
-                    const y = 80 + i * 40;
+                    const x = (this.frameCount * 0.5 + i * 200 * this.scale) % (this.canvas.width + 200 * this.scale) - 100 * this.scale;
+                    const y = 80 * this.scale + i * 40 * this.scale;
                     this.ctx.beginPath();
-                    this.ctx.arc(x, y, 30, 0, Math.PI * 2);
-                    this.ctx.arc(x + 25, y - 10, 25, 0, Math.PI * 2);
-                    this.ctx.arc(x + 50, y, 30, 0, Math.PI * 2);
+                    this.ctx.arc(x, y, cloudSize, 0, Math.PI * 2);
+                    this.ctx.arc(x + 25 * this.scale, y - 10 * this.scale, cloudSize * 0.8, 0, Math.PI * 2);
+                    this.ctx.arc(x + 50 * this.scale, y, cloudSize, 0, Math.PI * 2);
                     this.ctx.fill();
                 }
             }
@@ -340,22 +453,28 @@
                 // Глаз
                 this.ctx.fillStyle = 'black';
                 this.ctx.beginPath();
-                this.ctx.arc(10, -5, 6, 0, Math.PI * 2);
+                this.ctx.arc(10 * this.scale, -5 * this.scale, 6 * this.scale, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Зрачок
+                this.ctx.fillStyle = 'white';
+                this.ctx.beginPath();
+                this.ctx.arc(12 * this.scale, -6 * this.scale, 2 * this.scale, 0, Math.PI * 2);
                 this.ctx.fill();
                 
                 // Клюв
                 this.ctx.fillStyle = '#FF8C00';
                 this.ctx.beginPath();
-                this.ctx.moveTo(15, 0);
-                this.ctx.lineTo(35, -8);
-                this.ctx.lineTo(35, 8);
+                this.ctx.moveTo(15 * this.scale, 0);
+                this.ctx.lineTo(35 * this.scale, -8 * this.scale);
+                this.ctx.lineTo(35 * this.scale, 8 * this.scale);
                 this.ctx.closePath();
                 this.ctx.fill();
                 
                 // Крыло
                 this.ctx.fillStyle = '#FFA500';
                 this.ctx.beginPath();
-                this.ctx.ellipse(-5, 5, 15, 10, Math.PI / 4, 0, Math.PI * 2);
+                this.ctx.ellipse(-5 * this.scale, 5 * this.scale, 15 * this.scale, 10 * this.scale, Math.PI / 4, 0, Math.PI * 2);
                 this.ctx.fill();
                 
                 this.ctx.restore();
@@ -364,7 +483,7 @@
             drawPipes() {
                 this.ctx.fillStyle = '#228B22';
                 this.ctx.strokeStyle = '#006400';
-                this.ctx.lineWidth = 3;
+                this.ctx.lineWidth = 3 * this.scale;
                 
                 for (const pipe of this.pipes) {
                     // Верхняя труба
@@ -377,8 +496,8 @@
                     this.ctx.strokeRect(pipe.x, bottomY, pipe.width, pipe.bottomHeight);
                     
                     // Шляпки труб
-                    this.ctx.fillRect(pipe.x - 5, pipe.topHeight - 20, pipe.width + 10, 20);
-                    this.ctx.fillRect(pipe.x - 5, bottomY, pipe.width + 10, 20);
+                    this.ctx.fillRect(pipe.x - 5 * this.scale, pipe.topHeight - 20 * this.scale, pipe.width + 10 * this.scale, 20 * this.scale);
+                    this.ctx.fillRect(pipe.x - 5 * this.scale, bottomY, pipe.width + 10 * this.scale, 20 * this.scale);
                 }
             }
             
@@ -389,9 +508,10 @@
                 
                 // Трава
                 this.ctx.fillStyle = '#32CD32';
-                for (let i = 0; i < this.canvas.width; i += 20) {
-                    const height = 10 + Math.sin(i * 0.1 + this.frameCount * 0.1) * 5;
-                    this.ctx.fillRect(i, this.ground.y, 15, -height);
+                const grassSpacing = 20 * this.scale;
+                for (let i = 0; i < this.canvas.width; i += grassSpacing) {
+                    const height = (10 + Math.sin(i * 0.1 + this.frameCount * 0.1) * 5) * this.scale;
+                    this.ctx.fillRect(i, this.ground.y, 15 * this.scale, -height);
                 }
             }
             
@@ -409,6 +529,13 @@
         window.addEventListener('load', () => {
             new FlappyBird();
         });
+        
+        // Предотвращение скролла на мобильных устройствах
+        document.addEventListener('touchmove', (e) => {
+            if (e.target === document.getElementById('gameCanvas')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
     </script>
 </body>
 </html>
